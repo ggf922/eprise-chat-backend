@@ -1,9 +1,9 @@
 // api/chat.js
 import OpenAI from "openai";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// ✅ 환경변수에서 API 키 읽기
+const apiKey = process.env.OPENAI_API_KEY;
+const client = new OpenAI({ apiKey });
 
 export default async function handler(req, res) {
   // CORS (eprise에서 호출할 때 에러 안 나게)
@@ -19,9 +19,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "GET만 지원합니다." });
   }
 
-  const { message = "", lang = "ko" } = req.query;
+  // ✅ 환경변수 체크
+  if (!apiKey) {
+    return res.status(500).json({
+      error: "OPENAI_API_KEY 환경변수가 설정되어 있지 않습니다.",
+    });
+  }
 
-  // 버튼마다 다른 언어 지원
+  const message = (req.query.message || "").toString();
+  const lang = (req.query.lang || "ko").toString();
+
   let systemPrompt =
     "당신은 미용실 고객을 도와주는 친절한 한국어 헤어 AI 디자이너입니다. 짧고 이해하기 쉽게 답변하세요.";
   if (lang === "en") {
@@ -33,28 +40,24 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await client.responses.create({
+    const completion = await client.chat.completions.create({
       model: "gpt-4.1-mini",
-      input: [
+      messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: message },
       ],
     });
 
-    // Responses API 결과에서 텍스트 꺼내기 (양쪽 케이스 방어)
-    const first = response.output[0]?.content[0];
-    let replyText = "";
-    if (typeof first?.text === "string") {
-      replyText = first.text;
-    } else if (first?.text?.value) {
-      replyText = first.text.value;
-    } else {
-      replyText = "죄송합니다. 답변을 생성하지 못했습니다.";
-    }
+    const replyText =
+      completion.choices?.[0]?.message?.content ??
+      "죄송합니다, 답변을 생성하지 못했습니다.";
 
     return res.status(200).json({ reply: replyText });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "OpenAI 호출 오류" });
+  } catch (error) {
+    console.error("OpenAI 호출 오류:", error);
+    return res.status(500).json({
+      error: "OpenAI 호출 중 오류가 발생했습니다.",
+      detail: error.message ?? String(error),
+    });
   }
 }
