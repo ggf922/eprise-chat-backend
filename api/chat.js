@@ -1,10 +1,8 @@
 // api/chat.js
-// OpenAI SDK 없이, fetch로 Chat Completions API 호출하는 버전
-
-const apiKey = process.env.OPENAI_API_KEY;
+// fetch로 OpenAI Chat Completions 호출하는 버전 (env는 함수 안에서 읽기)
 
 export default async function handler(req, res) {
-  // CORS 설정 (eprise에서 호출 시 필요)
+  // CORS 설정
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -17,6 +15,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "GET만 지원합니다." });
   }
 
+  // ✅ 함수 안에서 env 읽기
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return res
       .status(500)
@@ -37,7 +37,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 🔥 OpenAI Chat Completions REST API 호출
     const apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -45,10 +44,10 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4.1-mini", // Chat GPT 모델 :contentReference[oaicite:1]{index=1}
+        model: "gpt-4.1-mini",
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: message },
+        { role: "system", content: systemPrompt },
+        { role: "user", content: message },
         ],
       }),
     });
@@ -67,9 +66,7 @@ export default async function handler(req, res) {
       data.choices?.[0]?.message?.content ??
       "죄송합니다, 답변을 생성하지 못했습니다.";
 
-    return res.status(200).json({
-      reply: replyText,
-    });
+    return res.status(200).json({ reply: replyText });
   } catch (error) {
     console.error("OpenAI 호출 오류:", error);
     return res.status(500).json({
